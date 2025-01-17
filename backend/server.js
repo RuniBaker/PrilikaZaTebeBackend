@@ -1,110 +1,117 @@
 const express = require('express');
-const { scrapeBravoProjects } = require('./scraper'); // Bravo scraper
-const { scrapeSaltoProjects } = require('./scraper'); // Bosnian scraper
-const { scrapeCroatiaProjects } = require('./scrapeCroatia'); // Croatian scraper
-const { scrapeSerbiaProjects } = require('./scrapeSerbia'); // Serbian scraper
-const { scrapeMontenegroProjects } = require('./scrapeMontenegro'); // Montenegro scraper
+const cors = require('cors');
+const NodeCache = require('node-cache');
 
+// Import scraper functions
+const { scrapeBravoProjects } = require('./scraper');
+const { scrapeSaltoProjects } = require('./scraper');
+const { scrapeCroatiaProjects } = require('./scrapeCroatia');
+const { scrapeSerbiaProjects } = require('./scrapeSerbia');
+const { scrapeMontenegroProjects } = require('./scrapeMontenegro');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const cors = require('cors');
+
+// Initialize cache
+const cache = new NodeCache({ stdTTL: 3600 }); // Cache TTL (1 hour)
+
 app.use(cors());
 
+// Helper function to get data with caching
+const getCachedData = async (key, scraperFunction) => {
+  // Check cache
+  const cachedData = cache.get(key);
+  if (cachedData) {
+    console.log(`Serving ${key} projects from cache`);
+    return cachedData;
+  }
+
+  // Fetch fresh data
+  console.log(`Fetching fresh data for ${key}`);
+  const data = await scraperFunction();
+  cache.set(key, data); // Store in cache
+  return data;
+};
 
 /**
  * API endpoint to scrape all projects (Bravo and Salto combined).
  */
 app.get('/api/projects', async (req, res) => {
   try {
-    console.log("Received request to /api/projects");
-    const bravoProjects = await scrapeBravoProjects();
-    const bosnianProjects = await scrapeSaltoProjects();
-    const croatianProjects = await scrapeCroatiaProjects();
-    const montenegroProjects = await scrapeMontenegroProjects();
-    const serbianProjects = await scrapeSerbiaProjects();
-    const allProjects = [...bravoProjects, ...bosnianProjects, ...croatianProjects, ...montenegroProjects, ...serbianProjects];
-    console.log("Scraped all projects:", allProjects);
+    console.log('Received request to /api/projects');
+    const bravoProjects = await getCachedData('bravo', scrapeBravoProjects);
+    const bosnianProjects = await getCachedData('bosnia', scrapeSaltoProjects);
+    const croatianProjects = await getCachedData('croatia', scrapeCroatiaProjects);
+    const montenegroProjects = await getCachedData('montenegro', scrapeMontenegroProjects);
+    const serbianProjects = await getCachedData('serbia', scrapeSerbiaProjects);
+    const allProjects = [
+      ...bravoProjects,
+      ...bosnianProjects,
+      ...croatianProjects,
+      ...montenegroProjects,
+      ...serbianProjects,
+    ];
     res.json(allProjects);
   } catch (error) {
-    console.error("Error in /api/projects:", error.message);
-    res.status(500).json({ error: "Failed to scrape projects" });
+    console.error('Error in /api/projects:', error.message);
+    res.status(500).json({ error: 'Failed to scrape projects' });
   }
 });
 
 /**
- * API endpoint to scrape Bravo projects.
+ * Individual API endpoints for each country.
  */
 app.get('/api/projects/bravo', async (req, res) => {
   try {
-    console.log("Received request to /api/projects/bravo");
-    const projects = await scrapeBravoProjects();
-    console.log("Scraped Bravo projects:", projects);
+    const projects = await getCachedData('bravo', scrapeBravoProjects);
     res.json(projects);
   } catch (error) {
-    console.error("Error in /api/projects/bravo:", error.message);
-    res.status(500).json({ error: "Failed to scrape Bravo projects" });
+    console.error('Error in /api/projects/bravo:', error.message);
+    res.status(500).json({ error: 'Failed to scrape Bravo projects' });
   }
 });
 
-/**
- * API endpoint to scrape Bosnian Salto projects.
- */
 app.get('/api/projects/bosnia', async (req, res) => {
   try {
-    console.log("Received request to /api/projects/bosnia");
-    const projects = await scrapeSaltoProjects();
-    console.log("Scraped Bosnian projects:", projects);
+    const projects = await getCachedData('bosnia', scrapeSaltoProjects);
     res.json(projects);
   } catch (error) {
-    console.error("Error in /api/projects/bosnia:", error.message);
-    res.status(500).json({ error: "Failed to scrape Bosnian projects" });
+    console.error('Error in /api/projects/bosnia:', error.message);
+    res.status(500).json({ error: 'Failed to scrape Bosnia projects' });
   }
 });
 
-/**
- * API endpoint to scrape Croatian Salto projects.
- */
 app.get('/api/projects/croatia', async (req, res) => {
   try {
-    console.log("Received request to /api/projects/croatia");
-    const projects = await scrapeCroatiaProjects();
-    console.log("Scraped Croatian projects:", projects);
+    const projects = await getCachedData('croatia', scrapeCroatiaProjects);
     res.json(projects);
   } catch (error) {
-    console.error("Error in /api/projects/croatia:", error.message);
-    res.status(500).json({ error: "Failed to scrape Croatian projects" });
+    console.error('Error in /api/projects/croatia:', error.message);
+    res.status(500).json({ error: 'Failed to scrape Croatia projects' });
   }
 });
 
-/**
- * API endpoint to scrape Montenegro Salto projects.
- */
 app.get('/api/projects/montenegro', async (req, res) => {
   try {
-    console.log("Received request to /api/projects/montenegro");
-    const projects = await scrapeMontenegroProjects();
-    console.log("Scraped Montenegro projects:", projects);
+    const projects = await getCachedData('montenegro', scrapeMontenegroProjects);
     res.json(projects);
   } catch (error) {
-    console.error("Error in /api/projects/montenegro:", error.message);
-    res.status(500).json({ error: "Failed to scrape Montenegro projects" });
+    console.error('Error in /api/projects/montenegro:', error.message);
+    res.status(500).json({ error: 'Failed to scrape Montenegro projects' });
   }
 });
 
 app.get('/api/projects/serbia', async (req, res) => {
   try {
-    console.log("Received request to /api/projects/serbia");
-    const projects = await scrapeSerbiaProjects();
-    console.log("Scraped Serbian projects:", projects);
+    const projects = await getCachedData('serbia', scrapeSerbiaProjects);
     res.json(projects);
   } catch (error) {
-    console.error("Error in /api/projects/serbia:", error.message);
-    res.status(500).json({ error: "Failed to scrape Serbia projects" });
+    console.error('Error in /api/projects/serbia:', error.message);
+    res.status(500).json({ error: 'Failed to scrape Serbia projects' });
   }
 });
 
-
+// Start the server
 app.listen(PORT, () => {
   console.log(`Server running on http://127.0.0.1:${PORT}`);
 });
