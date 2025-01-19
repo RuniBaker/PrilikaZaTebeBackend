@@ -71,8 +71,13 @@ const scrapeCroatiaProjectsPage = async (url) => {
  * Main function to scrape all pages for Croatia projects.
  */
 const scrapeCroatiaProjects = async () => {
-  const baseUrl =
-    'https://www.salto-youth.net/tools/european-training-calendar/browse/?b_keyword=&b_funded_by_yia=0&b_country=&b_participating_countries=country-78&b_accessible_for_disabled=0&b_begin_date_after_day=11&b_begin_date_after_month=1&b_begin_date_after_year=2025&b_end_date_before_day=&b_end_date_before_month=&b_end_date_before_year=&b_application_deadline_after_day=11&b_application_deadline_after_month=1&b_application_deadline_after_year=2025&b_application_deadline_before_day=&b_application_deadline_before_month=&b_application_deadline_before_year=&b_browse=Search+training+offers&b_offset=0&b_limit=10&b_order=applicationDeadline';
+  // Dynamically get today's date
+  const today = new Date();
+  const day = today.getDate();
+  const month = today.getMonth() + 1; // Month is zero-based
+  const year = today.getFullYear();
+
+  const baseUrl = `https://www.salto-youth.net/tools/european-training-calendar/browse/?b_keyword=&b_funded_by_yia=0&b_country=&b_participating_countries=country-78&b_accessible_for_disabled=0&b_begin_date_after_day=${day}&b_begin_date_after_month=${month}&b_begin_date_after_year=${year}&b_end_date_before_day=&b_end_date_before_month=&b_end_date_before_year=&b_application_deadline_after_day=${day}&b_application_deadline_after_month=${month}&b_application_deadline_after_year=${year}&b_application_deadline_before_day=&b_application_deadline_before_month=&b_application_deadline_before_year=&b_browse=Search+training+offers&b_offset=0&b_limit=10&b_order=applicationDeadline`;
 
   let currentPageUrl = baseUrl;
   const allProjects = [];
@@ -107,6 +112,5 @@ const scrapeAndPrintCroatiaProjects = async () => {
     console.log('-----------------------------------');
   });
 };
-
 
 module.exports = { scrapeCroatiaProjects };

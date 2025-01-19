@@ -1,6 +1,15 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
 
+// Helper function to get today's date components
+const getTodayDateComponents = () => {
+  const today = new Date();
+  const day = today.getDate();
+  const month = today.getMonth() + 1; // Months are 0-indexed
+  const year = today.getFullYear();
+  return { day, month, year };
+};
+
 let pastDeadlineCount = 0; // To count consecutive past deadlines
 
 /**
@@ -67,8 +76,9 @@ const scrapeSerbiaProjectsPage = async (url) => {
  * Main function to scrape all pages for Serbia projects.
  */
 const scrapeSerbiaProjects = async () => {
-  const baseUrl =
-    'https://www.salto-youth.net/tools/european-training-calendar/browse/?b_keyword=&b_funded_by_yia=0&b_country=&b_participating_countries=country-237&b_accessible_for_disabled=0&b_begin_date_after_day=11&b_begin_date_after_month=1&b_begin_date_after_year=2025&b_end_date_before_day=&b_end_date_before_month=&b_end_date_before_year=&b_application_deadline_after_day=11&b_application_deadline_after_month=1&b_application_deadline_after_year=2025&b_application_deadline_before_day=&b_application_deadline_before_month=&b_application_deadline_before_year=&b_browse=Search+training+offers&b_offset=0&b_limit=10&b_order=applicationDeadline';
+  const { day, month, year } = getTodayDateComponents();
+
+  const baseUrl = `https://www.salto-youth.net/tools/european-training-calendar/browse/?b_keyword=&b_funded_by_yia=0&b_country=&b_participating_countries=country-237&b_accessible_for_disabled=0&b_begin_date_after_day=${day}&b_begin_date_after_month=${month}&b_begin_date_after_year=${year}&b_end_date_before_day=&b_end_date_before_month=&b_end_date_before_year=&b_application_deadline_after_day=${day}&b_application_deadline_after_month=${month}&b_application_deadline_after_year=${year}&b_application_deadline_before_day=&b_application_deadline_before_month=&b_application_deadline_before_year=&b_browse=Search+training+offers&b_offset=0&b_limit=10&b_order=applicationDeadline`;
 
   let currentPageUrl = baseUrl;
   const allProjects = [];
@@ -105,5 +115,3 @@ const scrapeAndPrintSerbiaProjects = async () => {
 };
 
 module.exports = { scrapeSerbiaProjects };
-
-
