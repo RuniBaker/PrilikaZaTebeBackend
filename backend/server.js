@@ -2,11 +2,12 @@ const express = require('express');
 const cors = require('cors');
 const NodeCache = require('node-cache');
 
-// Import scraper functions
+// Import scraper functions from your existing scraper.js file
 const { 
-  scrapeBravoBiHProjects, 
+  scrapeBravoProjects, 
+  scrapeBravoBiHProjects,
   scrapeSaltoProjects 
-} = require('./combined-scraper');
+} = require('./scraper');
 
 const { scrapeCroatiaProjects } = require('./scrapeCroatia');
 const { scrapeSerbiaProjects } = require('./scrapeSerbia');
@@ -79,7 +80,7 @@ app.get('/api/projects', async (req, res) => {
  */
 app.get('/api/projects/bravo', async (req, res) => {
   try {
-    // Use the new BRAVO BiH scraper function
+    // Use the BRAVO BiH scraper function
     const projects = await getCachedData('bravo', scrapeBravoBiHProjects);
     res.json(projects);
   } catch (error) {
