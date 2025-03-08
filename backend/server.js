@@ -60,7 +60,7 @@ app.get('/api/projects', async (req, res) => {
       ]);
       
     const allProjects = [
-      ...bravoBiHProjects,
+      ...bravoBiHProjects,  // BRAVO BiH projects first
       ...bosnianProjects,
       ...croatianProjects,
       ...montenegroProjects,
@@ -97,9 +97,9 @@ app.get('/api/projects/bosnia', async (req, res) => {
       getCachedData('bravo', scrapeBravoBiHProjects)
     ]);
     
-    // Combine both types of projects
-    const allBosnianProjects = [...saltoProjects, ...bravoBiHProjects];
-    console.log(`Returning ${allBosnianProjects.length} combined Bosnian projects (${saltoProjects.length} SALTO + ${bravoBiHProjects.length} BRAVO BiH)`);
+    // FIXED: Combine both types of projects with BRAVO BiH first
+    const allBosnianProjects = [...bravoBiHProjects, ...saltoProjects];
+    console.log(`Returning ${allBosnianProjects.length} combined Bosnian projects (${bravoBiHProjects.length} BRAVO BiH + ${saltoProjects.length} SALTO)`);
     
     res.json(allBosnianProjects);
   } catch (error) {
