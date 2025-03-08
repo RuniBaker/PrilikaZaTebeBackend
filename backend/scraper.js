@@ -291,8 +291,8 @@ const scrapeAllProjects = async () => {
     
     console.log(`Found ${saltoProjects.length} SALTO projects and ${bravoBiHProjects.length} BRAVO BiH projects`);
     
-    // Combine the results
-    const allProjects = [...saltoProjects, ...bravoBiHProjects];
+    // Combine the results with BRAVO BiH projects first, followed by SALTO
+    const allProjects = [...bravoBiHProjects, ...saltoProjects];
     
     return allProjects;
   } catch (error) {
