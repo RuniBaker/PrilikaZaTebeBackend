@@ -102,113 +102,166 @@ const scrapeSaltoProjects = async () => {
 };
 
 /**
- * Function to scrape BRAVO BiH projects from both URLs
+ * Function to scrape BRAVO BiH Key Action 1 projects
+ * Based on the exact HTML structure provided
  */
 const scrapeBravoBiHProjects = async () => {
-  const bravoBiHUrls = [
-    "https://bravo-bih.com/bravo-projects/european-solidarity-corps/",
-    "https://bravo-bih.com/bravo-projects/key-action-1/"
-  ];
+  // Only scrape Key Action 1 projects as requested
+  const bravoBiHUrl = "https://bravo-bih.com/bravo-projects/key-action-1/";
 
   const allProjects = [];
+  const today = new Date();
+  let pastDeadlineCount = 0; // To count consecutive past deadlines
 
   try {
-    for (const baseUrl of bravoBiHUrls) {
-      console.log(`Scraping BRAVO BiH page: ${baseUrl}`);
+    console.log(`Scraping BRAVO BiH Key Action 1 page: ${bravoBiHUrl}`);
+    
+    // Get the main page that contains links to individual projects
+    const { data } = await axios.get(bravoBiHUrl);
+    const $ = cheerio.load(data);
+    
+    // Find all project links
+    const projectLinks = [];
+    
+    // Look for all links
+    $("a").each((i, el) => {
+      const href = $(el).attr("href");
+      const linkText = $(el).text().trim();
       
-      // Get the main page that contains links to individual projects
-      const { data } = await axios.get(baseUrl);
-      const $ = cheerio.load(data);
-      
-      // Find all project links
-      const projectLinks = [];
-      
-      // Look for links with the expected format
-      $("a.elementor-icon").each((i, el) => {
-        const href = $(el).attr("href");
-        const title = $(el).find("span").text().trim() || $(el).text().trim();
+      if (href && 
+          href.includes("bravo-bih.com") && 
+          (href.includes("open-call") || 
+           href.includes("exchange") || 
+           href.includes("youth") || 
+           href.includes("mobility") ||
+           href.includes("training"))) {
         
-        if (href && href.includes("bravo-bih.com")) {
+        // Check if this link is already in our list
+        const exists = projectLinks.some(link => link.url === href);
+        if (!exists) {
           projectLinks.push({
             url: href,
-            title: title
+            title: linkText
           });
         }
-      });
-      
-      // Also check for other potential link formats
-      $("a").each((i, el) => {
-        const href = $(el).attr("href");
-        const title = $(el).text().trim();
+      }
+    });
+    
+    console.log(`Found ${projectLinks.length} BRAVO BiH Key Action 1 project links`);
+    
+    // Visit each project page to extract details
+    for (const project of projectLinks) {
+      try {
+        console.log(`Scraping BRAVO BiH project: ${project.url}`);
         
-        // Only include links to the same domain and that contain "open-call" or similar keywords
-        if (href && 
-            href.includes("bravo-bih.com") && 
-            (href.includes("open-call") || href.includes("erasmus") || href.includes("call-for"))) {
+        const { data: projectData } = await axios.get(project.url);
+        const project$ = cheerio.load(projectData);
+        
+        // Extract project information exactly matching the HTML structure provided
+        let projectName = "";
+        let location = "";
+        let deadline = "";
+        let dates = "";
+        
+        // Process each list item
+        project$("ul li").each((i, el) => {
+          const text = project$(el).text().trim();
           
-          // Check if this link is already in our list
-          const exists = projectLinks.some(link => link.url === href);
-          if (!exists) {
-            projectLinks.push({
-              url: href,
-              title: title
-            });
+          if (text.includes("Name of the project:")) {
+            projectName = project$(el).find("strong").text().trim();
+          }
+          else if (text.includes("Places:")) {
+            location = project$(el).find("b").text().trim();
+            if (!location) location = project$(el).find("strong").text().trim();
+          }
+          else if (text.includes("Deadline for applying:")) {
+            deadline = project$(el).find("strong").text().trim();
+          }
+          else if (text.includes("Dates of Project:") || text.includes("Date of project:") || text.includes("Dates of the project:")) {
+            dates = project$(el).find("strong, b").text().trim();
+          }
+        });
+        
+        // If we still don't have a name, try to extract it from the page title
+        if (!projectName) {
+          projectName = project$("h1, h2").first().text().trim();
+        }
+        
+        // If we still don't have dates, look for date-like patterns in the content
+        if (!dates) {
+          const pageText = project$("body").text();
+          const dateRangeRegex = /(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\s*[–-]\s*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})/;
+          const dateRangeMatch = pageText.match(dateRangeRegex);
+          if (dateRangeMatch) {
+            dates = dateRangeMatch[0];
           }
         }
-      });
-      
-      console.log(`Found ${projectLinks.length} BRAVO BiH project links on ${baseUrl}`);
-      
-      // Visit each project page to extract details
-      for (const project of projectLinks) {
-        try {
-          console.log(`Scraping BRAVO BiH project: ${project.url}`);
-          
-          const { data: projectData } = await axios.get(project.url);
-          const project$ = cheerio.load(projectData);
-          
-          // Extract project information based on the provided HTML structure
-          let programName = "";
-          let location = "";
-          let deadline = "";
-          let dates = "";
-          
-          // Look for list items with labeled information
-          project$("ul li").each((i, el) => {
-            const text = project$(el).text().trim();
+        
+        // Skip projects missing required fields
+        if (!projectName || !location || !deadline || !dates) {
+          console.log(`Skipping incomplete BRAVO BiH project: "${projectName || project.title}"`);
+          console.log(`Missing fields: ${!projectName ? 'name ' : ''}${!location ? 'location ' : ''}${!deadline ? 'deadline ' : ''}${!dates ? 'dates' : ''}`);
+          continue;
+        }
+        
+        // Parse the deadline for past deadline check
+        let deadlinePassed = false;
+        if (deadline) {
+          // "Rolling basis" deadlines are always valid
+          if (deadline.toLowerCase().includes("rolling")) {
+            deadlinePassed = false;
+          } else {
+            // Try to extract dates from various formats
+            const dateRegex = /(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})/g;
+            const dateMatches = deadline.match(dateRegex);
             
-            if (text.includes("Name of the program:")) {
-              programName = project$(el).find("strong").text().trim();
+            if (dateMatches && dateMatches.length > 0) {
+              // Convert to standardized format for Date constructor
+              const parts = dateMatches[0].split(/[./-]/);
+              if (parts.length === 3) {
+                let year = parts[2];
+                if (year.length === 2) year = "20" + year; // Convert "23" to "2023"
+                
+                // European date format: day.month.year
+                const deadlineDate = new Date(`${year}-${parts[1]}-${parts[0]}`);
+                if (!isNaN(deadlineDate.getTime())) {
+                  deadlinePassed = deadlineDate < today;
+                  
+                  if (deadlinePassed) {
+                    console.log(`BRAVO BiH project "${projectName}" has passed deadline: ${deadline}`);
+                    pastDeadlineCount++;
+                    
+                    if (pastDeadlineCount >= 3) {
+                      console.log("Stopping BRAVO BiH scraping after 3 consecutive past deadlines");
+                      return allProjects; // Exit scraping
+                    }
+                    
+                    // Skip this project and continue with the next one
+                    continue;
+                  }
+                }
+              }
             }
-            else if (text.includes("Places:")) {
-              location = project$(el).find("b, strong").text().trim();
-            }
-            else if (text.includes("Deadline for applying:")) {
-              deadline = project$(el).find("strong").text().trim();
-            }
-            else if (text.includes("Date:") || text.includes("Duration:") || text.includes("Period:")) {
-              dates = project$(el).find("strong, b").text().trim();
-            }
-          });
-          
-          // If program name wasn't found, use the title from the link
-          if (!programName) {
-            programName = project.title;
           }
-          
-          // Add the extracted project to our list
-          allProjects.push({
-            title: programName,
-            dates: dates,
-            location: location,
-            deadline: deadline,
-            url: project.url,
-            source: "BRAVO BiH"
-          });
-          
-        } catch (error) {
-          console.error(`Error scraping BRAVO BiH project ${project.url}:`, error.message);
         }
+        
+        // Reset counter if this project's deadline hasn't passed
+        if (!deadlinePassed) {
+          pastDeadlineCount = 0;
+        }
+        
+        // Add the project to our list
+        allProjects.push({
+          title: projectName,
+          dates: dates,
+          location: location,
+          deadline: deadline,
+          url: project.url,
+          source: "BRAVO BiH"
+        });
+        
+      } catch (error) {
+        console.error(`Error scraping BRAVO BiH project ${project.url}:`, error.message);
       }
     }
   } catch (error) {
@@ -217,6 +270,11 @@ const scrapeBravoBiHProjects = async () => {
 
   return allProjects;
 };
+
+/**
+ * Alias for backward compatibility
+ */
+const scrapeBravoProjects = scrapeBravoBiHProjects;
 
 /**
  * Function to scrape all projects from both sources
@@ -247,5 +305,6 @@ const scrapeAllProjects = async () => {
 module.exports = {
   scrapeSaltoProjects,
   scrapeBravoBiHProjects,
+  scrapeBravoProjects, // For backward compatibility
   scrapeAllProjects
 };
