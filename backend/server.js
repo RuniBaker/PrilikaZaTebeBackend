@@ -3,8 +3,11 @@ const cors = require('cors');
 const NodeCache = require('node-cache');
 
 // Import scraper functions
-const { scrapeBravoProjects } = require('./scraper');
-const { scrapeSaltoProjects } = require('./scraper');
+const { 
+  scrapeBravoBiHProjects, 
+  scrapeSaltoProjects 
+} = require('./combined-scraper');
+
 const { scrapeCroatiaProjects } = require('./scrapeCroatia');
 const { scrapeSerbiaProjects } = require('./scrapeSerbia');
 const { scrapeMontenegroProjects } = require('./scrapeMontenegro');
@@ -25,12 +28,17 @@ const getCachedData = async (key, scraperFunction) => {
     console.log(`Serving ${key} projects from cache`);
     return cachedData;
   }
-
+  
   // Fetch fresh data
   console.log(`Fetching fresh data for ${key}`);
-  const data = await scraperFunction();
-  cache.set(key, data); // Store in cache
-  return data;
+  try {
+    const data = await scraperFunction();
+    cache.set(key, data); // Store in cache
+    return data;
+  } catch (error) {
+    console.error(`Error fetching data for ${key}:`, error.message);
+    return []; // Return empty array on error to prevent cascading failures
+  }
 };
 
 /**
@@ -39,18 +47,26 @@ const getCachedData = async (key, scraperFunction) => {
 app.get('/api/projects', async (req, res) => {
   try {
     console.log('Received request to /api/projects');
-    const bravoProjects = await getCachedData('bravo', scrapeBravoProjects);
-    const bosnianProjects = await getCachedData('bosnia', scrapeSaltoProjects);
-    const croatianProjects = await getCachedData('croatia', scrapeCroatiaProjects);
-    const montenegroProjects = await getCachedData('montenegro', scrapeMontenegroProjects);
-    const serbianProjects = await getCachedData('serbia', scrapeSerbiaProjects);
+    
+    // Fetch all project types in parallel
+    const [bravoBiHProjects, bosnianProjects, croatianProjects, montenegroProjects, serbianProjects] = 
+      await Promise.all([
+        getCachedData('bravo', scrapeBravoBiHProjects),
+        getCachedData('bosnia', scrapeSaltoProjects),
+        getCachedData('croatia', scrapeCroatiaProjects),
+        getCachedData('montenegro', scrapeMontenegroProjects),
+        getCachedData('serbia', scrapeSerbiaProjects)
+      ]);
+      
     const allProjects = [
-      ...bravoProjects,
+      ...bravoBiHProjects,
       ...bosnianProjects,
       ...croatianProjects,
       ...montenegroProjects,
       ...serbianProjects,
     ];
+    
+    console.log(`Returning ${allProjects.length} total projects`);
     res.json(allProjects);
   } catch (error) {
     console.error('Error in /api/projects:', error.message);
@@ -63,18 +79,28 @@ app.get('/api/projects', async (req, res) => {
  */
 app.get('/api/projects/bravo', async (req, res) => {
   try {
-    const projects = await getCachedData('bravo', scrapeBravoProjects);
+    // Use the new BRAVO BiH scraper function
+    const projects = await getCachedData('bravo', scrapeBravoBiHProjects);
     res.json(projects);
   } catch (error) {
     console.error('Error in /api/projects/bravo:', error.message);
-    res.status(500).json({ error: 'Failed to scrape Bravo projects' });
+    res.status(500).json({ error: 'Failed to scrape Bravo BiH projects' });
   }
 });
 
 app.get('/api/projects/bosnia', async (req, res) => {
   try {
-    const projects = await getCachedData('bosnia', scrapeSaltoProjects);
-    res.json(projects);
+    // Get both SALTO Bosnia projects AND BRAVO BiH projects
+    const [saltoProjects, bravoBiHProjects] = await Promise.all([
+      getCachedData('bosnia', scrapeSaltoProjects),
+      getCachedData('bravo', scrapeBravoBiHProjects)
+    ]);
+    
+    // Combine both types of projects
+    const allBosnianProjects = [...saltoProjects, ...bravoBiHProjects];
+    console.log(`Returning ${allBosnianProjects.length} combined Bosnian projects (${saltoProjects.length} SALTO + ${bravoBiHProjects.length} BRAVO BiH)`);
+    
+    res.json(allBosnianProjects);
   } catch (error) {
     console.error('Error in /api/projects/bosnia:', error.message);
     res.status(500).json({ error: 'Failed to scrape Bosnia projects' });
@@ -109,6 +135,13 @@ app.get('/api/projects/serbia', async (req, res) => {
     console.error('Error in /api/projects/serbia:', error.message);
     res.status(500).json({ error: 'Failed to scrape Serbia projects' });
   }
+});
+
+// Clear cache endpoint (useful for development and testing)
+app.get('/api/clear-cache', (req, res) => {
+  cache.flushAll();
+  console.log('Cache cleared');
+  res.json({ message: 'Cache cleared successfully' });
 });
 
 // Start the server
